@@ -1,6 +1,6 @@
 name: smart_debouncer
 description: A smart debouncer that dynamically adjusts delay using Exponential Moving Average (EMA) based on actual typing speed. Perfect for autocomplete/search API optimization.
-version: 0.0.1
+version: 0.0.2
 homepage: https://thanhdt.dev
 repository: https://github.com/thanhdang198/smart_debouncer
 
