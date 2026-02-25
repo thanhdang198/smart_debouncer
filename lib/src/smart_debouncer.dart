@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui' show VoidCallback;
 
 /// A smart debouncer that dynamically adjusts its delay based on the user's
 /// actual typing speed using the Exponential Moving Average (EMA) algorithm.
@@ -65,7 +64,13 @@ class SmartDebouncer {
     this.alpha = 0.3,
     this.pauseThreshold = 1500,
     this.multiplier = 1.5,
-  }) : _currentEma = (minDelay + maxDelay) / 2;
+  })  : assert(minDelay > 0, 'minDelay must be positive'),
+       assert(maxDelay > 0, 'maxDelay must be positive'),
+       assert(minDelay <= maxDelay, 'minDelay must be <= maxDelay'),
+       assert(alpha > 0 && alpha <= 1.0, 'alpha must be in range (0.0, 1.0]'),
+       assert(pauseThreshold > 0, 'pauseThreshold must be positive'),
+       assert(multiplier > 0, 'multiplier must be positive'),
+       _currentEma = (minDelay + maxDelay) / 2;
 
   /// Minimum debounce delay in milliseconds.
   final int minDelay;
@@ -100,14 +105,17 @@ class SmartDebouncer {
   /// The current Exponential Moving Average of typing intervals.
   double _currentEma;
 
+  /// Whether [dispose] has been called.
+  bool _isDisposed = false;
+
   /// Returns the current EMA value (for debugging/testing purposes).
   double get currentEma => _currentEma;
 
   /// Returns the current calculated dynamic delay in milliseconds,
   /// clamped between [minDelay] and [maxDelay].
   int get currentDelay {
-    final dynamic = (_currentEma * multiplier).round();
-    return dynamic.clamp(minDelay, maxDelay);
+    final rawDelay = (_currentEma * multiplier).round();
+    return rawDelay.clamp(minDelay, maxDelay);
   }
 
   /// Executes [action] after a dynamically calculated debounce delay.
@@ -118,7 +126,9 @@ class SmartDebouncer {
   ///
   /// If the interval between this call and the previous call exceeds
   /// [pauseThreshold], the EMA is not updated (pause filtering).
-  void run(VoidCallback action) {
+  void run(void Function() action) {
+    assert(!_isDisposed, 'SmartDebouncer.run() called after dispose()');
+
     // Cancel any existing timer
     _timer?.cancel();
 
@@ -138,19 +148,32 @@ class SmartDebouncer {
     _lastCallTime = now;
 
     // Calculate dynamic delay and clamp it within bounds
-    final dynamicDelay = (_currentEma * multiplier).round();
-    final clampedDelay = dynamicDelay.clamp(minDelay, maxDelay);
+    final rawDelay = (_currentEma * multiplier).round();
+    final clampedDelay = rawDelay.clamp(minDelay, maxDelay);
 
     // Schedule the action with the calculated delay
     _timer = Timer(Duration(milliseconds: clampedDelay), action);
+  }
+
+  /// Resets the EMA back to its initial value and clears the last call time.
+  ///
+  /// Useful when the search context changes (e.g., user clears the field
+  /// and starts a completely new search).
+  void reset() {
+    _timer?.cancel();
+    _timer = null;
+    _lastCallTime = 0;
+    _currentEma = (minDelay + maxDelay) / 2;
   }
 
   /// Cancels the current timer to prevent memory leaks.
   ///
   /// Always call this method when the debouncer is no longer needed,
   /// typically in the `dispose()` method of a `StatefulWidget`.
+  /// After calling [dispose], this instance must not be used again.
   void dispose() {
     _timer?.cancel();
     _timer = null;
+    _isDisposed = true;
   }
 }
