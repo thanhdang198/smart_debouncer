@@ -1,0 +1,5 @@
+/build/*
+.dart_tool/*
+.DS_Store
+.idea/*
+.vscode/*
